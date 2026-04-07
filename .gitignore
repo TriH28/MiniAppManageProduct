@@ -211,7 +211,7 @@ venv/
 .env
 
 # Không up database (để người dùng tự tạo bằng ETL)
-*.db
+
 
 # Không up các file tạm, file rác
 __pycache__/
