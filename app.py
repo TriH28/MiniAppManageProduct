@@ -54,7 +54,10 @@ try:
     selected_idx = product_options[product_options == selected_product_str].index[0]
     selected_id = int(products_df.loc[selected_idx, 'id'])
     
-    production_qty = st.sidebar.number_input("Số lượng cần sản xuất:", min_value=1, value=1, step=1)
+    production_qty = st.sidebar.number_input("Số lượng:", min_value=1, max_value=10000, value=1)
+    if production_qty < 1:
+        st.error("Số lượng phải ≥ 1")
+        st.stop()
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("**Mẹo:** Nếu cần cập nhật dữ liệu, chạy lại module ETL của Data Pipeline.")
@@ -78,7 +81,7 @@ try:
         col1, col2, col3 = st.columns(3)
         col1.metric("Tổng mã vật tư", len(bom_df))
         col2.metric("Số lượng SP yêu cầu", production_qty)
-        
+        col3.metric("Tổng nhu cầu mua", bom_df['Nhu Cầu Mua'].sum())
         # Nút Export to Excel
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='openpyxl') as writer:

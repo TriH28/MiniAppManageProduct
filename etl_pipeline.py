@@ -1,8 +1,16 @@
+import logging
 import pandas as pd
 import sqlite3
 import unicodedata
 import re
 import os
+
+# Thiết lập logging để ghi lại các lỗi và thông tin quan trọng trong quá trình ETL
+logging.basicConfig(
+    filename='etl.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 def slugify(text):
     if pd.isna(text):
@@ -43,6 +51,7 @@ def create_db(db_path):
 
 def parse_excel(file_path, conn):
     print(f"Parsing {file_path}...")
+    logging.info(f"Starting ETL for file: {file_path}")
     df = pd.read_excel(file_path, sheet_name=0, header=None)
     
     product_name = "Unknown"
@@ -65,6 +74,7 @@ def parse_excel(file_path, conn):
         product_code = product_name[:5].upper()
 
     print(f"Found Product: {product_code} - {product_name}")
+    logging.info(f"Extracted product info: {product_code} - {product_name}")
     
     c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO products (product_code, product_name) VALUES (?, ?)", (product_code, product_name))
@@ -133,10 +143,12 @@ def parse_excel(file_path, conn):
                 
                 data_rows.append((product_id, current_category, mat_code, name, spec, unit, qty))
             except Exception as e:
-                pass
+                print(f"❌ Lỗi dòng {i}: {e}")
+                logging.error(f"Parse error at row {i}: {e}")
                 
     c.executemany("INSERT INTO bill_of_materials (product_id, category, material_code, material_name, material_spec, unit, quantity_per_unit) VALUES (?, ?, ?, ?, ?, ?, ?)", data_rows)
     conn.commit()
+    logging.info(f"Successfully inserted {len(data_rows)} BOM items for product {product_code}")
 
 if __name__ == "__main__":
     import glob
