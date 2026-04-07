@@ -24,7 +24,6 @@ def load_bom(product_id):
         material_name AS `Tên Chi Tiết`, 
         material_spec AS `Quy cách/Kích thước`, 
         unit AS `Đơn Vị`, 
-        waste_percent AS `Tỉ lệ Hao hụt (%)`, 
         quantity_per_unit AS `Định Mức (1 SP)`
     FROM bill_of_materials 
     WHERE product_id = ?
@@ -32,8 +31,6 @@ def load_bom(product_id):
     """
     df = pd.read_sql(query, conn, params=(product_id,))
     conn.close()
-    # Convert decimal format of waste percentage
-    df['Tỉ lệ Hao hụt (%)'] = df['Tỉ lệ Hao hụt (%)'] * 100
     return df
 
 st.set_page_config(page_title="BOM Mini-App", layout="wide")
@@ -70,8 +67,8 @@ try:
         st.warning("Không tìm thấy dữ liệu cấu trúc vật tư cho sản phẩm này.")
     else:
         # Tự động tính toán số lượng tổng
-        # Nhu Cầu = Định Mức * N * (1 + Hao hụt)
-        bom_df['Nhu Cầu Mua'] = (bom_df['Định Mức (1 SP)'] * production_qty * (1 + bom_df['Tỉ lệ Hao hụt (%)'] / 100)).round(3)
+        # Nhu Cầu = Định Mức * N
+        bom_df['Nhu Cầu Mua'] = (bom_df['Định Mức (1 SP)'] * production_qty).round(3)
         
         # Sắp xếp hiển thị
         st.dataframe(bom_df, use_container_width=True, hide_index=True)

@@ -34,7 +34,6 @@ def create_db(db_path):
             material_name TEXT,
             material_spec TEXT,
             unit TEXT,
-            waste_percent REAL DEFAULT 0,
             quantity_per_unit REAL,
             FOREIGN KEY(product_id) REFERENCES products(id)
         );
@@ -132,11 +131,11 @@ def parse_excel(file_path, conn):
                 
                 mat_code = slugify(name + "-" + spec)
                 
-                data_rows.append((product_id, current_category, mat_code, name, spec, unit, 0.05 if unit == 'm3' else 0, qty))
+                data_rows.append((product_id, current_category, mat_code, name, spec, unit, qty))
             except Exception as e:
                 pass
                 
-    c.executemany("INSERT INTO bill_of_materials (product_id, category, material_code, material_name, material_spec, unit, waste_percent, quantity_per_unit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", data_rows)
+    c.executemany("INSERT INTO bill_of_materials (product_id, category, material_code, material_name, material_spec, unit, quantity_per_unit) VALUES (?, ?, ?, ?, ?, ?, ?)", data_rows)
     conn.commit()
 
 if __name__ == "__main__":
@@ -149,7 +148,8 @@ if __name__ == "__main__":
         print("Cảnh báo: Không tìm thấy file excel nào trong thư mục 'data/'")
         
     for f in files:
-        parse_excel(f, conn)
+        if not os.path.basename(f).startswith("~$"):
+            parse_excel(f, conn)
     
     # Verify
     df_db = pd.read_sql("SELECT * FROM bill_of_materials LIMIT 10", conn)
