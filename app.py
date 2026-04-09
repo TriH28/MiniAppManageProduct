@@ -2,8 +2,15 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import io
+import etl_pipeline
+import os
 
 DB_PATH = "database.db"
+
+# Đảm bảo DB được tạo sẵn nếu chưa tồn tại
+if not os.path.exists(DB_PATH):
+    conn = etl_pipeline.create_db(DB_PATH)
+    conn.close()
 
 def get_connection():
     return sqlite3.connect(DB_PATH)
@@ -21,8 +28,10 @@ def load_bom(product_id):
     SELECT 
         category AS `Loại Vật Tư`, 
         material_code AS `Mã Vật Tư`, 
-        material_name AS `Tên Chi Tiết`, 
-        material_spec AS `Quy cách/Kích thước`, 
+        material_name AS `Tên Chi Tiết`,
+        material_type AS `Loại Nguyên Vật Liệu`,
+        material_spec AS `Quy cách/Kích thước`,
+        technical_desc AS `Mô Tả Kỹ Thuật/Chất Lượng`,
         unit AS `Đơn Vị`, 
         quantity_per_unit AS `Định Mức (1 SP)`
     FROM bill_of_materials 
@@ -41,26 +50,53 @@ st.markdown("Hệ thống tự động phân tích và tính toán Nhu cầu V�
 # Sidebar Controls
 st.sidebar.header("Lập Kế Hoạch Sản Xuất")
 
+# --- FILE UPLOAD (Thay thế việc chạy Python tay) ---
+st.sidebar.markdown("### 📥 Thêm Sản Phẩm Mới")
+uploaded_file = st.sidebar.file_uploader("Kéo thả file Excel (BOM) vào đây", type=["xlsx", "xls"])
+if uploaded_file is not None:
+    if "last_uploaded" not in st.session_state or st.session_state["last_uploaded"] != uploaded_file.name:
+        with st.spinner("Đang phân tích và ghi vào Database..."):
+            try:
+                conn = etl_pipeline.create_db(DB_PATH)
+                etl_pipeline.parse_excel(uploaded_file, conn, default_file_name=uploaded_file.name)
+                conn.close()
+                st.session_state["last_uploaded"] = uploaded_file.name
+                st.sidebar.success(f"Đã lưu thành công: {uploaded_file.name}")
+                st.rerun() # Refresh lại dữ liệu ngay lập tức
+            except Exception as e:
+                st.sidebar.error(f"Lỗi đọc file: {e}")
+
+st.sidebar.markdown("---")
+
 try:
     products_df = load_products()
     if products_df.empty:
-        st.error("Chưa có dữ liệu sản phẩm trong DB. Hãy chạy etl_pipeline.py trước!")
+        st.info("👋 Chào mừng bạn, hiện hệ thống đang chưa có dữ liệu sản phẩm. Vui lòng upload file Excel ở cột bên trái.")
         st.stop()
         
-    product_options = products_df['product_code'] + " - " + products_df['product_name']
+    # Tạo nhãn hiển thị tránh lặp mã và tên: nếu tên đã chứa/bắt đầu bằng mã hoặc trùng mã, thì chỉ hiện tên.
+    labels = []
+    for _, row in products_df.iterrows():
+        code, name = str(row['product_code']), str(row['product_name'])
+        if name.upper().startswith(code.upper()) or code.upper() == name.upper():
+            labels.append(name)
+        else:
+            labels.append(f"{code} - {name}")
+            
+    products_df['display_label'] = labels
+    product_options = products_df['display_label']
     selected_product_str = st.sidebar.selectbox("Chọn Sản Phẩm:", product_options)
     
     # Get ID of selected
-    selected_idx = product_options[product_options == selected_product_str].index[0]
+    selected_idx = products_df[products_df['display_label'] == selected_product_str].index[0]
     selected_id = int(products_df.loc[selected_idx, 'id'])
     
     production_qty = st.sidebar.number_input("Số lượng:", min_value=1, max_value=10000, value=1)
     if production_qty < 1:
-        st.error("Số lượng phải ≥ 1")
+        st.sidebar.error("Số lượng phải ≥ 1")
         st.stop()
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("**Mẹo:** Nếu cần cập nhật dữ liệu, chạy lại module ETL của Data Pipeline.")
     
     # Main Body
     st.subheader(f"📊 Bảng Định Mức Vật Tư: {selected_product_str}")
