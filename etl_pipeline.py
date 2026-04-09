@@ -121,18 +121,31 @@ def parse_excel(file_path, conn):
                     spec = f"{thick} x {width} x {length}".replace("nan", "0")
                     qty = float(str(df.iloc[i, 6]).strip()) if not pd.isna(df.iloc[i, 6]) else 0
                     unit = "m3" # mặc định
-                else:
-                    # Packaging / Assembly often has different columns
-                    # We look for qty in column 4 or 5 or 6
+                elif current_category == "Vật Tư Lắp Ráp":
+                    # Quy cách vật tư lắp ráp ở cột F (index 5)
+                    spec = str(df.iloc[i, 5]).strip()
+                    if spec == "nan": spec = ""
+                    # Số lượng ở cột K/L (index 10 hoặc 11), ta quét từ cột 8 đến 12 để cover mọi trường hợp
+                    qty = 0
+                    for c_idx in range(8, 13):
+                        if c_idx < len(df.columns):
+                            val = str(df.iloc[i, c_idx]).replace(",", "").strip()
+                            if val.replace(".", "", 1).isdigit():
+                                qty = float(val)
+                                break
+                    unit = "cái"
+                else: # Vật Tư Đóng Gói và các loại khác
+                    # Packaging often has different columns, fallback
                     spec = str(df.iloc[i, 3]).strip()
                     if spec == "nan": spec = ""
-                    # SL usually is around col 4, 5, 6. Let's try parsing
+                    # Tăng vùng tìm kiếm số lượng rộng ra từ cột 4 đến cột 12
                     qty = 0
-                    for c_idx in range(4, 9):
-                        val = str(df.iloc[i, c_idx]).replace(",", "").strip()
-                        if val.replace(".", "", 1).isdigit():
-                            qty = float(val)
-                            break
+                    for c_idx in range(4, 13):
+                        if c_idx < len(df.columns):
+                            val = str(df.iloc[i, c_idx]).replace(",", "").strip()
+                            if val.replace(".", "", 1).isdigit():
+                                qty = float(val)
+                                break
                     unit = "cái"
                     
                 # Fix unit from material string if possible
